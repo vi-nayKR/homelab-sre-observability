@@ -3,6 +3,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+evidence_directory="$repo_root/evidence/runtime"
+mkdir -p "$evidence_directory/queries" "$evidence_directory/alerts"
 
 for command in docker curl jq; do
   command -v "$command" >/dev/null 2>&1 || {
@@ -30,7 +32,7 @@ wait_for() {
   local description="$1"
   local attempt
   shift
-  for ((attempt = 1; attempt <= 60; attempt++)); do
+  for ((attempt = 1; attempt <= 100; attempt++)); do
     if "$@" >/dev/null 2>&1; then
       echo "ready: $description"
       return 0
@@ -39,6 +41,29 @@ wait_for() {
   done
   echo "timed out waiting for $description" >&2
   return 1
+}
+
+query_has_no_result() {
+  local query="$1"
+  curl -fsS --get --data-urlencode "query=$query" \
+    http://127.0.0.1:9090/api/v1/query \
+    | jq -e '.status == "success" and (.data.result | length == 0)' >/dev/null
+}
+
+alertmanager_has_alert() {
+  local alert_name="$1"
+  curl -fsS --get --data-urlencode "filter=alertname=$alert_name" \
+    http://127.0.0.1:9093/api/v2/alerts \
+    | jq -e --arg alert_name "$alert_name" \
+      'any(.[]; .labels.alertname == $alert_name and .status.state == "active")' >/dev/null
+}
+
+capture_query() {
+  local query="$1"
+  local output="$2"
+  curl -fsS --get --data-urlencode "query=$query" \
+    http://127.0.0.1:9090/api/v1/query \
+    | jq . > "$output"
 }
 
 query_has_result() {
@@ -56,6 +81,15 @@ wait_for "Alertmanager" curl -fsS http://127.0.0.1:9093/-/ready
 wait_for "Grafana" curl -fsS http://127.0.0.1:3000/api/health
 wait_for "demo API scrape" query_has_result 'up{job="demo-api"} == 1'
 wait_for "black-box success" query_has_result 'probe_success{job="blackbox-http"} == 1'
+
+{
+  printf 'commit=%s\n' "${GITHUB_SHA:-$(git rev-parse HEAD)}"
+  printf 'started_utc=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  printf 'runner_os=%s\n' "$(uname -s)"
+  printf 'runner_arch=%s\n' "$(uname -m)"
+  printf 'scope=ephemeral single-host Compose readiness incident\n'
+} > "$evidence_directory/metadata.txt"
+capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/before.json"
 
 curl -fsS 'http://127.0.0.1:8080/work' >/dev/null
 failure_status="$(curl -sS -o /dev/null -w '%{http_code}' \
@@ -78,11 +112,32 @@ readiness_status="$(curl -sS -o /dev/null -w '%{http_code}' \
 curl -fsS http://127.0.0.1:8080/health/live >/dev/null
 wait_for "observed readiness failure" query_has_result \
   'probe_success{job="blackbox-http"} == 0'
+wait_for "BlackboxProbeFailed firing in Prometheus" query_has_result \
+  'ALERTS{alertname="BlackboxProbeFailed",alertstate="firing"} == 1'
+wait_for "BlackboxProbeFailed routed by Alertmanager" alertmanager_has_alert \
+  'BlackboxProbeFailed'
+wait_for "firing webhook delivered" query_has_result \
+  'sre_demo_alertmanager_webhooks_total{status="firing"} >= 1'
+capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/during.json"
+capture_query 'ALERTS{alertname="BlackboxProbeFailed"}' "$evidence_directory/alerts/firing-prometheus.json"
+curl -fsS --get --data-urlencode 'filter=alertname=BlackboxProbeFailed' \
+  http://127.0.0.1:9093/api/v2/alerts | jq . \
+  > "$evidence_directory/alerts/firing-alertmanager.json"
+printf 'detected_utc=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+  >> "$evidence_directory/metadata.txt"
 
 curl -fsS -X POST \
   'http://127.0.0.1:8080/admin/readiness?ready=true' >/dev/null
 wait_for "observed readiness recovery" query_has_result \
   'probe_success{job="blackbox-http"} == 1'
+wait_for "Prometheus alert resolution" query_has_no_result \
+  'ALERTS{alertname="BlackboxProbeFailed",alertstate="firing"}'
+wait_for "resolved webhook delivered" query_has_result \
+  'sre_demo_alertmanager_webhooks_total{status="resolved"} >= 1'
+capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/after.json"
+capture_query 'sre_demo_alertmanager_webhooks_total' "$evidence_directory/alerts/webhook-counts.json"
+printf 'recovered_utc=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+  >> "$evidence_directory/metadata.txt"
 
 curl -fsS http://127.0.0.1:3000/api/health \
   | jq -e '.database == "ok"' >/dev/null

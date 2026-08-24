@@ -128,6 +128,7 @@ The script checks:
 - Alertmanager configuration;
 - Compose resolution and the demo container build when Docker is available.
 - clean-stack startup, service readiness, metric scraping, injected readiness failure, black-box observation and recovery in CI.
+- a real two-minute `BlackboxProbeFailed` hold, Prometheus firing state, Alertmanager routing, firing/resolved webhook delivery, and retained API evidence in CI.
 
 The CI workflow requires the container checks. A local environment without Docker may validate source and telemetry rules, but that is not full runtime proof.
 
@@ -147,14 +148,13 @@ Verified on a clean GitHub-hosted AMD64 Linux runner by CI:
 - bounded 5xx metric generation;
 - readiness failure while liveness remains healthy;
 - black-box observation of failure and recovery;
+- `BlackboxProbeFailed` transition to firing, Alertmanager routing, and firing/resolved webhook delivery;
 - stack teardown with volumes.
 
 Do not describe the following as complete until artifacts exist under `evidence/`:
 
 - clean-clone runtime on ARM64;
-- a firing and resolved alert transcript;
 - a dashboard snapshot backed by raw query output;
-- an alert-to-recovery game day;
 - a completed postmortem corrective action;
 - long-window availability or error-budget performance.
 
