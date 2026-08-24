@@ -17,4 +17,3 @@ In the game day, query whether `delay_ms` traffic is active. In a real service, 
 ## Mitigation and verification
 
 Stop the controlled slow load or roll back the causally identified change. Verify normal requests, p95 recovery over two evaluation windows, stable error rate and no hidden request-rate collapse.
-

@@ -52,4 +52,3 @@ The in-service receiver is deliberately a demonstrator, not a production design.
 3. Add Grafana Alloy and Loki with redaction and short retention.
 4. Instrument a disposable Go dependency with OpenTelemetry.
 5. Only then propose minimal Medha API instrumentation through its normal review/deploy path.
-

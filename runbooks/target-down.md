@@ -39,4 +39,3 @@ docker compose logs --since 10m demo-api blackbox-exporter prometheus
 ## Escalation
 
 Escalate when recovery requires changing data, credentials, network policy or a live Medha node. Create a change record and identify backup/rollback before proceeding.
-

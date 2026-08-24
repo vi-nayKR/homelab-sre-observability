@@ -106,4 +106,3 @@ groups:
           summary: Latest verified backup is stale on {{ $labels.instance }}
           description: No successful backup has been recorded for more than 26 hours.
           runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md
-

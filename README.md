@@ -155,4 +155,3 @@ Source implementation and configuration are present. Do not describe the followi
 - No actual availability, MTTR or performance improvement is claimed yet.
 
 See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and [docs/SECURITY.md](docs/SECURITY.md).
-

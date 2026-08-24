@@ -42,4 +42,3 @@ if grep -q 'medha_backup_last_success_timestamp_seconds{backup_type="postgres_pr
 fi
 
 echo "backup metrics tests passed"
-

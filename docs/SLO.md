@@ -54,4 +54,3 @@ These multi-window conditions reduce pages for single scrape blips while detecti
 4. Is 99.5% stricter or looser than user need and hardware reality?
 5. Are maintenance and observer gaps represented honestly?
 6. Does latency need separate objectives by request class?
-

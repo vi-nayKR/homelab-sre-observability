@@ -80,4 +80,3 @@ make down
 ```
 
 Do not delete the named telemetry volumes until evidence has been exported and reviewed.
-

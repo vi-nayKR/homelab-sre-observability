@@ -29,4 +29,3 @@ Dependabot proposes updates, but operators must review release notes, image prov
 ## Reporting
 
 This is a personal lab. Do not file public issues containing private hostnames, IP addresses, logs, access tokens or customer data. Rotate any credential immediately if it is committed, then remove it from history; deleting the latest line is not sufficient.
-

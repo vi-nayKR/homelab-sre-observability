@@ -28,4 +28,3 @@ The newest checksum-verified backup is older than 26 hours or no valid checksum 
 - Archive list/checksum succeeds.
 - An isolated restore drill is scheduled or completed; archive validation alone is not restore proof.
 - Alert resolves after two scrape intervals.
-

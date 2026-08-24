@@ -6,4 +6,3 @@
     service: example-api
     environment: production
     slo: availability
-

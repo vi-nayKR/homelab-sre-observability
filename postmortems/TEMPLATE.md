@@ -1,9 +1,9 @@
 # Postmortem: <short incident name>
 
-Status: draft  
-Date/time zone:  
-Authors/reviewers:  
-Severity:  
+Status: draft
+Date/time zone:
+Authors/reviewers:
+Severity:
 
 ## Summary
 
@@ -54,4 +54,3 @@ At least one action must be implemented and tested before calling a portfolio ga
 ## Lessons and follow-up
 
 What assumption changed? Which runbook, alert, test or architecture decision must change?
-

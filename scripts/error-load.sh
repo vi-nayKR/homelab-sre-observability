@@ -60,4 +60,3 @@ case "${1:-}" in
   run) run_load ;;
   *) echo "usage: $0 <start|stop>" >&2; exit 64 ;;
 esac
-

@@ -30,4 +30,3 @@ inhibit_rules:
     equal:
       - service
       - environment
-

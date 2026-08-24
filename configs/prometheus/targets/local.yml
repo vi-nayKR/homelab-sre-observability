@@ -4,4 +4,3 @@
     service: demo-api
     environment: lab
     slo: availability
-

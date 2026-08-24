@@ -23,4 +23,3 @@ groups:
 
       - record: sre_sli:probe_duration_seconds:avg_rate5m
         expr: avg_over_time(probe_duration_seconds{job="blackbox-http",slo="availability"}[5m])
-

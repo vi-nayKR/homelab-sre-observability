@@ -34,4 +34,3 @@
 - “Handles N requests per second.”
 
 Replace a limitation only when the repository contains reproducible evidence and the README is updated in the same commit.
-

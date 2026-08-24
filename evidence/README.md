@@ -16,4 +16,3 @@ verification.txt        validation and corrective-action result
 ```
 
 Never publish environment files, cookies, Authorization headers, private addresses, access URLs containing tokens, database rows or unredacted logs.
-

@@ -38,4 +38,3 @@ For a real service, prefer the smallest reversible action: remove a bad instance
 - The five-minute ratio trends down and the alert resolves.
 - Request rate has not fallen to zero and hidden the problem.
 - A corrective action is assigned if the incident was not an exercise.
-
