@@ -28,11 +28,12 @@ cleanup() {
 }
 trap 'cleanup $?' EXIT
 
-wait_for() {
+wait_for_up_to() {
   local description="$1"
+  local max_attempts="$2"
   local attempt
-  shift
-  for ((attempt = 1; attempt <= 100; attempt++)); do
+  shift 2
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     if "$@" >/dev/null 2>&1; then
       echo "ready: $description"
       return 0
@@ -41,6 +42,12 @@ wait_for() {
   done
   echo "timed out waiting for $description" >&2
   return 1
+}
+
+wait_for() {
+  local description="$1"
+  shift
+  wait_for_up_to "$description" 100 "$@"
 }
 
 query_has_no_result() {
@@ -132,7 +139,10 @@ wait_for "observed readiness recovery" query_has_result \
   'probe_success{job="blackbox-http"} == 1'
 wait_for "Prometheus alert resolution" query_has_no_result \
   'ALERTS{alertname="BlackboxProbeFailed",alertstate="firing"}'
-wait_for "resolved webhook delivered" query_has_result \
+# The route's five-minute group interval intentionally applies to resolved
+# notifications too. Keep this wait bounded, but long enough to observe that
+# configured delivery contract instead of racing it.
+wait_for_up_to "resolved webhook delivered" 200 query_has_result \
   'sre_demo_alertmanager_webhooks_total{status="resolved"} >= 1'
 capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/after.json"
 capture_query 'sre_demo_alertmanager_webhooks_total' "$evidence_directory/alerts/webhook-counts.json"
