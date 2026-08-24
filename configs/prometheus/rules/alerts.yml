@@ -1,0 +1,109 @@
+groups:
+  - name: service-symptoms
+    rules:
+      - alert: DemoServiceUnavailable
+        expr: up{job="demo-api"} == 0
+        for: 2m
+        labels:
+          severity: page
+          team: sre-lab
+          service: demo-api
+        annotations:
+          summary: Demo API metrics target is unavailable
+          description: Prometheus has failed to scrape the demo API for two minutes.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+          dashboard_url: http://127.0.0.1:3000/d/sre-overview
+
+      - alert: BlackboxProbeFailed
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels:
+          severity: page
+          team: sre-lab
+        annotations:
+          summary: User-path probe is failing for {{ $labels.service }}
+          description: The black-box probe to {{ $labels.instance }} has failed for two minutes.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+          dashboard_url: http://127.0.0.1:3000/d/sre-overview
+
+      - alert: DemoHighErrorRatio
+        expr: sre_demo:http_errors:ratio_rate5m > 0.05
+        for: 5m
+        labels:
+          severity: page
+          team: sre-lab
+          service: demo-api
+          environment: lab
+        annotations:
+          summary: Demo API error ratio exceeds 5%
+          description: The five-minute server-error ratio is {{ $value | humanizePercentage }}.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/high-error-rate.md
+          dashboard_url: http://127.0.0.1:3000/d/sre-overview
+
+      - alert: DemoHighP95Latency
+        expr: sre_demo:http_request_duration_seconds:p95_rate5m > 0.5
+        for: 10m
+        labels:
+          severity: ticket
+          team: sre-lab
+          service: demo-api
+          environment: lab
+        annotations:
+          summary: Demo API p95 latency exceeds 500 ms
+          description: Five-minute p95 request latency is {{ $value | humanizeDuration }}.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/high-latency.md
+          dashboard_url: http://127.0.0.1:3000/d/sre-overview
+
+  - name: error-budget-burn
+    rules:
+      - alert: AvailabilityErrorBudgetFastBurn
+        expr: |
+          (
+            (1 - avg_over_time(probe_success{job="blackbox-http",slo="availability"}[1h])) / 0.005 > 14.4
+          )
+          and on (instance, service, environment)
+          (
+            (1 - avg_over_time(probe_success{job="blackbox-http",slo="availability"}[5m])) / 0.005 > 14.4
+          )
+        for: 2m
+        labels:
+          severity: page
+          team: sre-lab
+          slo_target: "99.5"
+        annotations:
+          summary: Availability error budget is burning quickly for {{ $labels.service }}
+          description: Both one-hour and five-minute burn rates exceed 14.4x for {{ $labels.instance }}.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+
+      - alert: AvailabilityErrorBudgetSlowBurn
+        expr: |
+          (
+            (1 - avg_over_time(probe_success{job="blackbox-http",slo="availability"}[6h])) / 0.005 > 6
+          )
+          and on (instance, service, environment)
+          (
+            (1 - avg_over_time(probe_success{job="blackbox-http",slo="availability"}[30m])) / 0.005 > 6
+          )
+        for: 15m
+        labels:
+          severity: ticket
+          team: sre-lab
+          slo_target: "99.5"
+        annotations:
+          summary: Availability error budget is burning persistently for {{ $labels.service }}
+          description: Both six-hour and thirty-minute burn rates exceed 6x for {{ $labels.instance }}.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+
+  - name: backup-freshness
+    rules:
+      - alert: BackupStale
+        expr: time() - medha_backup_last_success_timestamp_seconds > 93600
+        for: 10m
+        labels:
+          severity: page
+          team: sre-lab
+        annotations:
+          summary: Latest verified backup is stale on {{ $labels.instance }}
+          description: No successful backup has been recorded for more than 26 hours.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md
+

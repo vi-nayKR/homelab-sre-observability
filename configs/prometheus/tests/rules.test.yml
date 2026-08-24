@@ -1,0 +1,90 @@
+rule_files:
+  - ../rules/recording.yml
+  - ../rules/alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: unavailable demo service pages after the hold period
+    interval: 1m
+    input_series:
+      - series: up{job="demo-api", instance="demo-api:8080", environment="lab"}
+        values: 0x10
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: DemoServiceUnavailable
+        exp_alerts:
+          - exp_labels:
+              alertname: DemoServiceUnavailable
+              environment: lab
+              instance: demo-api:8080
+              job: demo-api
+              service: demo-api
+              severity: page
+              team: sre-lab
+            exp_annotations:
+              summary: Demo API metrics target is unavailable
+              description: Prometheus has failed to scrape the demo API for two minutes.
+              runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+              dashboard_url: http://127.0.0.1:3000/d/sre-overview
+
+  - name: failed blackbox probe consumes availability budget
+    interval: 1m
+    input_series:
+      - series: probe_success{job="blackbox-http", instance="http://demo-api:8080/health/ready", service="demo-api", environment="lab", slo="availability"}
+        values: 0x70
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BlackboxProbeFailed
+        exp_alerts:
+          - exp_labels:
+              alertname: BlackboxProbeFailed
+              environment: lab
+              instance: http://demo-api:8080/health/ready
+              job: blackbox-http
+              service: demo-api
+              severity: page
+              slo: availability
+              team: sre-lab
+            exp_annotations:
+              summary: User-path probe is failing for demo-api
+              description: The black-box probe to http://demo-api:8080/health/ready has failed for two minutes.
+              runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+              dashboard_url: http://127.0.0.1:3000/d/sre-overview
+      - eval_time: 4m
+        alertname: AvailabilityErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              alertname: AvailabilityErrorBudgetFastBurn
+              environment: lab
+              instance: http://demo-api:8080/health/ready
+              job: blackbox-http
+              service: demo-api
+              severity: page
+              slo: availability
+              slo_target: "99.5"
+              team: sre-lab
+            exp_annotations:
+              summary: Availability error budget is burning quickly for demo-api
+              description: Both one-hour and five-minute burn rates exceed 14.4x for http://demo-api:8080/health/ready.
+              runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+
+  - name: stale backup pages after the hold period
+    interval: 1m
+    input_series:
+      - series: medha_backup_last_success_timestamp_seconds{instance="storage-node", environment="homelab"}
+        values: 0x1800
+    alert_rule_test:
+      - eval_time: 27h
+        alertname: BackupStale
+        exp_alerts:
+          - exp_labels:
+              alertname: BackupStale
+              environment: homelab
+              instance: storage-node
+              severity: page
+              team: sre-lab
+            exp_annotations:
+              summary: Latest verified backup is stale on storage-node
+              description: No successful backup has been recorded for more than 26 hours.
+              runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md

@@ -1,0 +1,9 @@
+# Rename this file to medha-public.yml only on the monitoring host after reviewing
+# probe frequency, authorization and the target's expected availability window.
+- targets:
+    - https://api.example.com/health/ready
+  labels:
+    service: example-api
+    environment: production
+    slo: availability
+

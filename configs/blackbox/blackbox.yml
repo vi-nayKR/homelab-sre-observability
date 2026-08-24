@@ -1,0 +1,15 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true
+      follow_redirects: true
+      enable_http2: true
+      valid_status_codes:
+        - 200
+      tls_config:
+        min_version: TLS12
+

@@ -1,0 +1,13 @@
+# Add a separate scrape job before using these node-exporter targets. Never expose
+# port 9100 to the Internet; permit only the monitoring host on the private LAN.
+- targets:
+    - 10.0.0.10:9100
+  labels:
+    node_role: worker
+    environment: homelab
+- targets:
+    - 10.0.0.20:9100
+  labels:
+    node_role: storage
+    environment: homelab
+
