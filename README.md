@@ -151,11 +151,12 @@ Verified on a clean GitHub-hosted AMD64 Linux runner by CI:
 - `BlackboxProbeFailed` transition to firing, Alertmanager routing, and firing/resolved webhook delivery;
 - stack teardown with volumes.
 
+Accepted evidence: [workflow run `32764397577`](https://github.com/vi-nayKR/homelab-sre-observability/actions/runs/32764397577), commit `8a8b319`, with the [completed readiness-alert postmortem](postmortems/2026-08-24-readiness-alert-lifecycle.md).
+
 Do not describe the following as complete until artifacts exist under `evidence/`:
 
 - clean-clone runtime on ARM64;
 - a dashboard snapshot backed by raw query output;
-- a completed postmortem corrective action;
 - long-window availability or error-budget performance.
 
 ## Limitations
