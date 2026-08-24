@@ -79,9 +79,9 @@ fi
 
 if command -v docker >/dev/null 2>&1; then
   echo "checking Compose model and demo image build"
-  GRAFANA_ADMIN_USER=ci-admin \
-    GRAFANA_ADMIN_PASSWORD=ci-validation-only-not-a-secret \
-    docker compose config --quiet
+  export GRAFANA_ADMIN_USER=ci-admin
+  export GRAFANA_ADMIN_PASSWORD=ci-validation-only-not-a-secret
+  docker compose config --quiet
   docker compose build demo-api
 elif [[ "${REQUIRE_CONTAINER_VALIDATION:-0}" == "1" ]]; then
   echo "Docker is required because REQUIRE_CONTAINER_VALIDATION=1" >&2
