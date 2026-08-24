@@ -67,7 +67,20 @@ func TestAlertWebhookBoundsStatusLabel(t *testing.T) {
 		t.Fatalf("alert status = %d, want %d", got, http.StatusNoContent)
 	}
 	metrics := executeRequest(t, handler, http.MethodGet, "/metrics", "").Body.String()
-	if !strings.Contains(metrics, `sre_demo_alertmanager_webhooks_total{status="unknown"} 1`) {
+	if !strings.Contains(metrics, `sre_demo_alertmanager_webhooks_total{alertname="other",status="unknown"} 1`) {
 		t.Fatal("unknown Alertmanager status was not normalized")
+	}
+}
+
+func TestAlertWebhookRetainsBoundedAlertName(t *testing.T) {
+	app := newApplication(&bytes.Buffer{})
+	handler := app.routes()
+	body := `{"status":"resolved","alerts":[{"labels":{"alertname":"BlackboxProbeFailed"}}]}`
+	if got := executeRequest(t, handler, http.MethodPost, "/alerts", body).Code; got != http.StatusNoContent {
+		t.Fatalf("alert status = %d, want %d", got, http.StatusNoContent)
+	}
+	metrics := executeRequest(t, handler, http.MethodGet, "/metrics", "").Body.String()
+	if !strings.Contains(metrics, `sre_demo_alertmanager_webhooks_total{alertname="BlackboxProbeFailed",status="resolved"} 1`) {
+		t.Fatal("known Alertmanager alert name was not retained")
 	}
 }

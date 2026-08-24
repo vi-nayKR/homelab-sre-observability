@@ -90,8 +90,8 @@ func newApplication(logOutput io.Writer) *application {
 		alerts: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "sre_demo",
 			Name:      "alertmanager_webhooks_total",
-			Help:      "Alertmanager webhook payloads received by status.",
-		}, []string{"status"}),
+			Help:      "Alertmanager webhook payloads received by status and bounded alert name.",
+		}, []string{"status", "alertname"}),
 	}
 	registry.MustRegister(metrics.requests, metrics.duration, metrics.inFlight, metrics.ready, metrics.alerts)
 
@@ -225,8 +225,10 @@ func (a *application) handleSetReadiness(w http.ResponseWriter, r *http.Request)
 
 func (a *application) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Status string            `json:"status"`
-		Alerts []json.RawMessage `json:"alerts"`
+		Status string `json:"status"`
+		Alerts []struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"alerts"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&payload); err != nil {
@@ -237,9 +239,28 @@ func (a *application) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	if status != "firing" && status != "resolved" {
 		status = "unknown"
 	}
-	a.metrics.alerts.WithLabelValues(status).Inc()
-	a.logger.Warn("alertmanager webhook received", "status", status, "alert_count", len(payload.Alerts))
+	alertName := "other"
+	if len(payload.Alerts) > 0 {
+		alertName = boundedAlertName(payload.Alerts[0].Labels["alertname"])
+	}
+	a.metrics.alerts.WithLabelValues(status, alertName).Inc()
+	a.logger.Warn("alertmanager webhook received", "status", status, "alert_name", alertName, "alert_count", len(payload.Alerts))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func boundedAlertName(alertName string) string {
+	switch alertName {
+	case "DemoServiceUnavailable",
+		"BlackboxProbeFailed",
+		"DemoHighErrorRatio",
+		"DemoHighP95Latency",
+		"AvailabilityErrorBudgetFastBurn",
+		"AvailabilityErrorBudgetSlowBurn",
+		"BackupStale":
+		return alertName
+	default:
+		return "other"
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

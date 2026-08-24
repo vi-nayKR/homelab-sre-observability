@@ -124,7 +124,7 @@ wait_for "BlackboxProbeFailed firing in Prometheus" query_has_result \
 wait_for "BlackboxProbeFailed routed by Alertmanager" alertmanager_has_alert \
   'BlackboxProbeFailed'
 wait_for "firing webhook delivered" query_has_result \
-  'sre_demo_alertmanager_webhooks_total{status="firing"} >= 1'
+  'sre_demo_alertmanager_webhooks_total{status="firing",alertname="BlackboxProbeFailed"} >= 1'
 capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/during.json"
 capture_query 'ALERTS{alertname="BlackboxProbeFailed"}' "$evidence_directory/alerts/firing-prometheus.json"
 curl -fsS --get --data-urlencode 'filter=alertname=BlackboxProbeFailed' \
@@ -143,7 +143,7 @@ wait_for "Prometheus alert resolution" query_has_no_result \
 # notifications too. Keep this wait bounded, but long enough to observe that
 # configured delivery contract instead of racing it.
 wait_for_up_to "resolved webhook delivered" 200 query_has_result \
-  'sre_demo_alertmanager_webhooks_total{status="resolved"} >= 1'
+  'sre_demo_alertmanager_webhooks_total{status="resolved",alertname="BlackboxProbeFailed"} >= 1'
 capture_query 'probe_success{job="blackbox-http"}' "$evidence_directory/queries/after.json"
 capture_query 'sre_demo_alertmanager_webhooks_total' "$evidence_directory/alerts/webhook-counts.json"
 printf 'recovered_utc=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
