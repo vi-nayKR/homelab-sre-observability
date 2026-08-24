@@ -125,6 +125,7 @@ The script checks:
 - Prometheus alert/recording rule tests;
 - Alertmanager configuration;
 - Compose resolution and the demo container build when Docker is available.
+- clean-stack startup, service readiness, metric scraping, injected readiness failure, black-box observation and recovery in CI.
 
 The CI workflow requires the container checks. A local environment without Docker may validate source and telemetry rules, but that is not full runtime proof.
 

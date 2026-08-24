@@ -45,3 +45,6 @@ jobs:
         env:
           REQUIRE_CONTAINER_VALIDATION: "1"
         run: ./scripts/validate.sh
+
+      - name: Boot stack and verify failure observation and recovery
+        run: ./scripts/smoke-test.sh
