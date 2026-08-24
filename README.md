@@ -1,5 +1,7 @@
 # Homelab SRE Observability
 
+[![CI](https://github.com/vi-nayKR/homelab-sre-observability/actions/workflows/ci.yml/badge.svg)](https://github.com/vi-nayKR/homelab-sre-observability/actions/workflows/ci.yml)
+
 A reproducible reliability lab that answers four operator questions:
 
 1. Are users succeeding?
@@ -137,9 +139,19 @@ Pages describe user-visible symptoms or imminent loss of recovery capability. Da
 
 ## Evidence status
 
-Source implementation and configuration are present. Do not describe the following as complete until artifacts exist under `evidence/`:
+Verified on a clean GitHub-hosted AMD64 Linux runner by CI:
 
-- clean-clone Compose startup on both ARM64 and AMD64;
+- full Compose resolution and demo image build;
+- clean-stack startup for the API, Prometheus, Alertmanager, Grafana and blackbox exporter;
+- direct health, white-box scrape and black-box success;
+- bounded 5xx metric generation;
+- readiness failure while liveness remains healthy;
+- black-box observation of failure and recovery;
+- stack teardown with volumes.
+
+Do not describe the following as complete until artifacts exist under `evidence/`:
+
+- clean-clone runtime on ARM64;
 - a firing and resolved alert transcript;
 - a dashboard snapshot backed by raw query output;
 - an alert-to-recovery game day;
