@@ -86,7 +86,7 @@ The first recovery gate is an explicit cold backup of **only this project's** th
 ./scripts/backup-stack.sh --offline /application-private-path/backups
 ```
 
-This declares a maintenance gap, stops only `homelab-sre-prod`, archives each project-labeled volume, computes checksums, extracts into fresh disposable restore volumes, and verifies every regular file's hash. Temporary restore volumes are removed, and the original stack is started again even on backup failure. It never restores over live volumes. Utility containers are network-isolated/resource-limited; temporary DAC/ownership capabilities are required solely to archive/restore this project's mixed-UID data.
+This declares a maintenance gap, stops only `homelab-sre-prod`, archives each project-labeled volume, computes checksums, extracts into fresh disposable restore volumes, and verifies every regular file's hash. The exit handler removes temporary restore volumes and attempts to restart the original stack through the full HTTP readiness gate, even on backup failure; failure to recover returns a nonzero status. It never restores over live volumes. Utility containers are network-isolated/resource-limited; temporary DAC/ownership capabilities are required solely to archive/restore this project's mixed-UID data.
 
 Keep archives private: Grafana state can contain sensitive data. A file-content restore drill is **not** a full application recovery/RTO test. Arrange encrypted off-host copies, a tested full service restore, measured RPO/RTO and a backup schedule before accepting production recovery requirements. The existing backup-freshness exporter is separate; do not point it at other applications without their owner's approval.
 

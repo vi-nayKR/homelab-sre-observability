@@ -25,7 +25,9 @@ cleanup() {
   result=$?
   trap - EXIT
   for volume in "${restores[@]}"; do docker volume rm "$volume" >/dev/null || result=1; done
-  compose up --no-build --detach --wait --wait-timeout 180 || result=1
+  # Docker's running state is not Grafana/Prometheus readiness. Reuse the full
+  # HTTP readiness and protected-endpoint gate before declaring recovery.
+  "$root/scripts/deploy-local.sh" || result=1
   exit "$result"
 }
 trap cleanup EXIT
