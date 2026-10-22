@@ -24,7 +24,7 @@ for target in \
   "http://127.0.0.1:${SRE_ALERTMANAGER_PORT:-9093}/-/ready" \
   "http://127.0.0.1:${SRE_GRAFANA_PORT:-3000}/api/health"; do
   ready=0
-  for attempt in {1..60}; do
+  for _ in {1..60}; do
     if curl --max-time 3 -fsS "$target" >/dev/null; then ready=1; break; fi
     sleep 2
   done
