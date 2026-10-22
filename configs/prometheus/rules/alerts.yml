@@ -106,3 +106,34 @@ groups:
           summary: Latest verified backup is stale on {{ $labels.instance }}
           description: No successful backup has been recorded for more than 26 hours.
           runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md
+
+  - name: monitoring-health
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          team: sre-lab
+        annotations:
+          summary: Monitoring pipeline heartbeat
+          description: An independent receiver must detect missing heartbeats; local delivery alone cannot detect host loss.
+      - alert: MonitoringTargetDown
+        expr: up{job!="demo-api"} == 0
+        for: 5m
+        labels:
+          severity: page
+          team: sre-lab
+        annotations:
+          summary: A monitoring dependency is unavailable
+          description: Check the target, its exporter and the scrape path before suppressing this alert.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/target-down.md
+      - alert: BackupMetricsMissing
+        expr: up{job="node-exporter",backup_expected="true"} == 1 unless on (instance) medha_backup_last_success_timestamp_seconds
+        for: 10m
+        labels:
+          severity: page
+          team: sre-lab
+        annotations:
+          summary: Expected backup freshness metrics are missing
+          description: The exporter is reachable but its explicitly expected backup-success timestamp is absent.
+          runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md

@@ -1,0 +1,11 @@
+# A verified Linux static binary is built/tested from the same reviewed commit.
+# Keeps compilers and dependency downloads off the shared deployment host.
+FROM scratch
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
+COPY bin/reliability-api /reliability-api
+USER 65532:65532
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/reliability-api", "healthcheck"]
+ENTRYPOINT ["/reliability-api"]

@@ -12,7 +12,7 @@
 
 ## Secrets
 
-Only the local Grafana bootstrap credential belongs in `.env`. Do not add alert webhook credentials, cloud keys or Medha secrets to Prometheus labels or checked-in configuration. For a real receiver, inject a secret at deployment time from a secret manager or root-readable host file.
+The disposable lab uses a local Grafana bootstrap credential in `.env`. The hardened overlay uses file-backed Grafana and webhook secrets from a private directory outside the checkout. It rejects placeholders and never logs secret contents. Do not add webhook credentials, cloud keys or existing application secrets to labels/configuration. Compose local secrets are ordinary file mounts, not encrypted storage; use a managed secret store where the operating environment requires one.
 
 ## Exporters
 
@@ -20,7 +20,7 @@ Node Exporter reveals host and filesystem metadata. Bind it to a private address
 
 ## Failure endpoints
 
-`/admin/readiness` and `/work?fail=true` exist to make failure observable. The Compose port is loopback-only. A production service should compile out such controls or require strong authorization and an audited change workflow.
+`/admin/readiness` and `/work?fail=true` are available only when `LAB_CONTROLS_ENABLED=true`; the binary default is false, and the hardened overlay forces false. Delay injection is also disabled. The hardened API has no lab receiver; a separate receiver requires a mounted bearer token and accepts one bounded JSON payload. Keep every published port on loopback and use SSH forwarding. The deployment gate forbids host namespaces, privilege additions, Docker socket/root mounts, inherited profiles and cross-project volumes/networks.
 
 ## Dependency updates
 

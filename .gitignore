@@ -3,3 +3,9 @@
 bin/
 coverage.out
 evidence/runtime/
+__pycache__/
+.private/
+.state/
+.deploy/
+.env.*
+!.env.example

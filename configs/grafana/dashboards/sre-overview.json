@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Measured probe success over the selected window. The 99.5% value is a target, not a claim of achieved availability.",
+      "description": "Observed samples only over the selected window: missing scrapes are not counted here. Use 28-day coverage and the conservative scheduled-probe panel before interpreting the SLO. 99.5% is a target, not a verified achievement.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -88,7 +88,7 @@
           "refId": "A"
         }
       ],
-      "title": "Measured availability",
+      "title": "Observed availability (selected window)",
       "type": "stat"
     },
     {
@@ -595,6 +595,39 @@
       ],
       "title": "Firing alerts",
       "type": "stat"
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "28-day probe sample coverage",
+      "description": "At the fixed 15-second schedule, 161280 observations are expected. Coverage below 99% suppresses the conservative SLO panel. Missing samples are not successes.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "noValue": "No coverage evidence"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sre_sli:availability:coverage_ratio28d", "instant": true, "range": false, "refId": "A"}]
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "28-day conservative availability",
+      "description": "Successes / all expected probes; missing observations consume budget. No value during warm-up or insufficient retained coverage. This is not independent host-loss monitoring.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "noValue": "Insufficient 28-day data"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sre_sli:availability:ratio28d", "instant": true, "range": false, "refId": "A"}]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Observed successful /work under 500 ms (28d)",
+      "description": "Ratio from successful-request bucket/count increases, not averaged quantiles. Coverage-gated observed traffic only; unknown requests during scrape gaps cannot establish strict latency compliance.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "noValue": "Insufficient traffic or coverage"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sre_sli:work_latency:ratio28d", "instant": true, "range": false, "refId": "A"}]
     }
   ],
   "refresh": "15s",

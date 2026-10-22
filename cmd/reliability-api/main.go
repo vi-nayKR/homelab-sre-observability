@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,10 +33,12 @@ type serviceMetrics struct {
 }
 
 type application struct {
-	logger   *slog.Logger
-	registry *prometheus.Registry
-	metrics  serviceMetrics
-	ready    atomic.Bool
+	logger      *slog.Logger
+	registry    *prometheus.Registry
+	metrics     serviceMetrics
+	ready       atomic.Bool
+	labControls bool
+	alertToken  string
 }
 
 type statusRecorder struct {
@@ -76,7 +79,7 @@ func newApplication(logOutput io.Writer) *application {
 			Name:      "http_request_duration_seconds",
 			Help:      "HTTP request duration by bounded route.",
 			Buckets:   []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
-		}, []string{"method", "route"}),
+		}, []string{"method", "route", "status_class"}),
 		inFlight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "sre_demo",
 			Name:      "http_requests_in_flight",
@@ -111,8 +114,12 @@ func (a *application) routes() http.Handler {
 	mux.Handle("GET /work", a.instrument("/work", http.HandlerFunc(a.handleWork)))
 	mux.Handle("GET /health/live", a.instrument("/health/live", http.HandlerFunc(a.handleLive)))
 	mux.Handle("GET /health/ready", a.instrument("/health/ready", http.HandlerFunc(a.handleReady)))
-	mux.Handle("POST /admin/readiness", a.instrument("/admin/readiness", http.HandlerFunc(a.handleSetReadiness)))
-	mux.Handle("POST /alerts", a.instrument("/alerts", http.HandlerFunc(a.handleAlerts)))
+	if a.labControls {
+		mux.Handle("POST /admin/readiness", a.instrument("/admin/readiness", http.HandlerFunc(a.handleSetReadiness)))
+	}
+	if a.labControls || a.alertToken != "" {
+		mux.Handle("POST /alerts", a.instrument("/alerts", http.HandlerFunc(a.handleAlerts)))
+	}
 	mux.Handle("GET /metrics", promhttp.HandlerFor(a.registry, promhttp.HandlerOpts{}))
 	return mux
 }
@@ -133,7 +140,7 @@ func (a *application) instrument(route string, next http.Handler) http.Handler {
 		elapsed := time.Since(started)
 		class := fmt.Sprintf("%dxx", recorder.status/100)
 		a.metrics.requests.WithLabelValues(method, route, class).Inc()
-		a.metrics.duration.WithLabelValues(method, route).Observe(elapsed.Seconds())
+		a.metrics.duration.WithLabelValues(method, route, class).Observe(elapsed.Seconds())
 		a.logger.Info("request completed",
 			"method", method,
 			"route", route,
@@ -160,6 +167,10 @@ func (a *application) handleRoot(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *application) handleWork(w http.ResponseWriter, r *http.Request) {
+	if !a.labControls && (r.URL.Query().Has("fail") || r.URL.Query().Has("delay_ms")) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "fault injection is disabled"})
+		return
+	}
 	delay, err := parseDelay(r.URL.Query().Get("delay_ms"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -189,11 +200,11 @@ func parseDelay(raw string) (time.Duration, error) {
 	if err != nil || milliseconds < 0 {
 		return 0, errors.New("delay_ms must be a non-negative integer")
 	}
-	delay := time.Duration(milliseconds) * time.Millisecond
-	if delay > maxWorkDelay {
+	// Compare before conversion: a large int can overflow time.Duration.
+	if milliseconds > int(maxWorkDelay/time.Millisecond) {
 		return 0, fmt.Errorf("delay_ms must not exceed %d", maxWorkDelay.Milliseconds())
 	}
-	return delay, nil
+	return time.Duration(milliseconds) * time.Millisecond, nil
 }
 
 func (a *application) handleLive(w http.ResponseWriter, _ *http.Request) {
@@ -224,6 +235,10 @@ func (a *application) handleSetReadiness(w http.ResponseWriter, r *http.Request)
 }
 
 func (a *application) handleAlerts(w http.ResponseWriter, r *http.Request) {
+	if a.alertToken != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+a.alertToken)) != 1 {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid webhook authorization"})
+		return
+	}
 	var payload struct {
 		Status string `json:"status"`
 		Alerts []struct {
@@ -233,6 +248,10 @@ func (a *application) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&payload); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid Alertmanager payload"})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "expected one JSON payload"})
 		return
 	}
 	status := payload.Status
@@ -256,7 +275,7 @@ func boundedAlertName(alertName string) string {
 		"DemoHighP95Latency",
 		"AvailabilityErrorBudgetFastBurn",
 		"AvailabilityErrorBudgetSlowBurn",
-		"BackupStale":
+		"BackupStale", "Watchdog", "MonitoringTargetDown", "BackupMetricsMissing":
 		return alertName
 	default:
 		return "other"
@@ -269,12 +288,42 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
+func configuredApplication(logOutput io.Writer) (*application, error) {
+	app := newApplication(logOutput)
+	if raw := os.Getenv("LAB_CONTROLS_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return nil, errors.New("LAB_CONTROLS_ENABLED must be a boolean")
+		}
+		app.labControls = enabled
+	}
+	if path := os.Getenv("ALERT_WEBHOOK_TOKEN_FILE"); path != "" {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read webhook token file: %w", err)
+		}
+		app.alertToken = strings.TrimSpace(string(raw))
+		if len(app.alertToken) < 32 {
+			return nil, errors.New("webhook token must contain at least 32 bytes")
+		}
+	}
+	return app, nil
+}
+
+func (a *application) markUnready() {
+	a.ready.Store(false)
+	a.metrics.ready.Set(0)
+}
+
 func runServer() error {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	app := newApplication(os.Stdout)
+	app, err := configuredApplication(os.Stdout)
+	if err != nil {
+		return err
+	}
 	server := &http.Server{
 		Addr:              ":" + port,
 		Handler:           app.routes(),
@@ -295,6 +344,9 @@ func runServer() error {
 
 	select {
 	case <-ctx.Done():
+		app.markUnready()
+		// Give upstream probes a bounded drain interval before closing listeners.
+		time.Sleep(3 * time.Second)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)

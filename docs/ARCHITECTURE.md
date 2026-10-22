@@ -27,7 +27,7 @@ Raw URL paths, query parameters, request IDs, users, IP addresses and error mess
 
 - Liveness answers whether the process is capable of making progress. It does not call dependencies.
 - Readiness answers whether the instance should receive traffic. The lab can set it false while liveness stays true.
-- Startup is represented by Docker's health-check start period; the Kubernetes project will add an explicit startup probe.
+- Startup uses Docker's health-check start period. During SIGTERM handling the API first drops readiness, allows a bounded drain interval, then performs graceful HTTP shutdown.
 
 Restarting a live process because a database is temporarily unavailable can amplify an incident. Orchestrators should remove a not-ready instance from traffic and reserve liveness restart for unrecoverable process failure.
 
@@ -35,13 +35,13 @@ Restarting a live process because a database is temporarily unavailable can ampl
 
 Prometheus evaluates recording and alerting rules every 15 seconds. Alertmanager groups by alert name, service and environment, inhibits lower-signal demo alerts when the service target itself is down, and posts firing/resolved lab notifications to `/alerts`.
 
-The in-service receiver is deliberately a demonstrator, not a production design. A real receiver must remain available when the monitored service fails.
+The in-service receiver belongs only to the disposable lab. The hardened overlay routes to a separately supervised receiver with file-backed bearer authentication; the monitored API can stop without stopping this receiver. Both still share the host. `Watchdog` exercises the path, but independent host-loss paging requires an external missing-heartbeat receiver. See [operations and recovery](OPERATIONS.md).
 
 ## Storage and resource controls
 
-- Prometheus retention: 15 days and 4 GB.
+- Prometheus retention: 35 days and 8 GB; coverage guards expose earlier size eviction or missing data instead of silently claiming a full 28-day observation window.
 - Named volumes hold Prometheus, Alertmanager and Grafana state.
-- Component memory and CPU limits prevent the lab from exhausting an 8 GiB monitoring laptop.
+- Per-container CPU/memory ceilings and bounded logs limit this stack's resource use. Shared-host capacity still needs review; ceilings do not guarantee zero workload contention.
 - Containers drop Linux capabilities and disallow privilege escalation where supported.
 - Host ports bind to loopback.
 

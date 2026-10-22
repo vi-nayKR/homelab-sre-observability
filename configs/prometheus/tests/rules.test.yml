@@ -88,3 +88,72 @@ tests:
               summary: Latest verified backup is stale on storage-node
               description: No successful backup has been recorded for more than 26 hours.
               runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md
+
+  - name: health probes cannot dilute user errors
+    interval: 1m
+    input_series:
+      - series: sre_demo_http_requests_total{route="/work",status_class="5xx"}
+        values: 0+10x10
+      - series: sre_demo_http_requests_total{route="/health/ready",status_class="2xx"}
+        values: 0+10000x10
+    promql_expr_test:
+      - expr: sre_demo:http_errors:ratio_rate5m
+        eval_time: 5m
+        exp_samples:
+          - labels: '{__name__="sre_demo:http_errors:ratio_rate5m"}'
+            value: 1
+
+  - name: healthy user traffic has a zero error ratio before any failure
+    interval: 1m
+    input_series:
+      - series: sre_demo_http_requests_total{route="/work",status_class="2xx"}
+        values: 0+10x10
+    promql_expr_test:
+      - expr: sre_demo:http_errors:ratio_rate5m
+        eval_time: 5m
+        exp_samples:
+          - labels: '{__name__="sre_demo:http_errors:ratio_rate5m"}'
+            value: 0
+
+  - name: a partial window cannot claim 28 day compliance
+    interval: 1m
+    input_series:
+      - series: probe_success{job="blackbox-http",instance="test",service="test",environment="test",slo="availability"}
+        values: 1x35
+    promql_expr_test:
+      - expr: sre_sli:availability:ratio28d
+        eval_time: 30m
+        exp_samples: []
+
+  - name: watchdog continuously exercises the notification path
+    interval: 1m
+    alert_rule_test:
+      - alertname: Watchdog
+        eval_time: 1m
+        exp_alerts:
+          - exp_labels:
+              severity: none
+              team: sre-lab
+            exp_annotations:
+              summary: Monitoring pipeline heartbeat
+              description: An independent receiver must detect missing heartbeats; local delivery alone cannot detect host loss.
+
+  - name: explicitly expected backup metrics cannot disappear silently
+    interval: 1m
+    input_series:
+      - series: up{job="node-exporter",instance="test-node",backup_expected="true"}
+        values: 1x20
+    alert_rule_test:
+      - alertname: BackupMetricsMissing
+        eval_time: 11m
+        exp_alerts:
+          - exp_labels:
+              job: node-exporter
+              instance: test-node
+              backup_expected: "true"
+              severity: page
+              team: sre-lab
+            exp_annotations:
+              summary: Expected backup freshness metrics are missing
+              description: The exporter is reachable but its explicitly expected backup-success timestamp is absent.
+              runbook_url: https://github.com/vi-nayKR/homelab-sre-observability/blob/main/runbooks/stale-backup.md

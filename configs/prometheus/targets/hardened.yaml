@@ -1,0 +1,5 @@
+- targets: ["http://demo-api:8080/health/ready"]
+  labels:
+    service: demo-api
+    environment: homelab
+    slo: availability

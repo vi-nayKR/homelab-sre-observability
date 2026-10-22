@@ -1,0 +1,59 @@
+# Single-host hardening, not HA or approval for public exposure.
+services:
+  demo-api:
+    environment:
+      LAB_CONTROLS_ENABLED: "false"
+    stop_grace_period: 20s
+    pids_limit: 128
+
+  prometheus:
+    command:
+      - --config.file=/etc/prometheus/prometheus.hardened.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=35d
+      - --storage.tsdb.retention.size=8GB
+
+  alertmanager:
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.hardened.yml
+      - --storage.path=/alertmanager
+    secrets:
+      - receiver_token
+
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ""
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+    secrets:
+      - grafana_password
+
+  alert-receiver:
+    image: homelab-sre-observability/demo-api:${SRE_IMAGE_TAG:-local}
+    pull_policy: never
+    environment:
+      LAB_CONTROLS_ENABLED: "false"
+      ALERT_WEBHOOK_TOKEN_FILE: /run/secrets/receiver_token
+    secrets:
+      - receiver_token
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 128
+    stop_grace_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [observability]
+
+secrets:
+  grafana_password:
+    file: ${SRE_SECRETS_DIR:?set an application-private secret directory}/grafana_password
+  receiver_token:
+    file: ${SRE_SECRETS_DIR:?set an application-private secret directory}/receiver_token

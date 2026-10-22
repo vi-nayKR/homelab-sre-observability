@@ -28,7 +28,13 @@ SLI          = good events / valid events
 
 Starter objective: **95% over a rolling 28-day window**.
 
-The dashboard currently shows a five-minute p95. A complete SLO implementation should use histogram bucket counts over the SLO window rather than averaging quantiles.
+The five-minute p95 remains an operational signal, filtered to successful `/work` requests. Histograms now include bounded `status_class` labels, and the 28-day observed-latency ratio uses successful-request bucket/count increases, not averaged quantiles. It is coverage-gated but cannot establish strict latency compliance for unknown requests during scrape gaps.
+
+## Retention, coverage and unknown observations
+
+Prometheus is configured for 35 days with an 8 GB ceiling. The first limit reached wins; capacity settings alone do not prove retained history. At the fixed 15-second schedule, `sre_sli:availability:coverage_ratio28d` compares observed samples with 161,280 expected probes. If the schedule changes, update this denominator and tests in the same change.
+
+`observed_ratio28d` averages only available samples. The conservative `ratio28d` instead divides successful probes by **all expected probes**, charging missing observations against the error budget, and is absent below 99% coverage. A newly deployed stack must not display a fictional complete-window success. This is a conservative scheduled-probe estimate, not independent proof of real user availability; maintenance is not silently excluded. Dashboard panels use instant queries so a stale previous compliant value is not reused after coverage drops.
 
 ## Burn alerts
 

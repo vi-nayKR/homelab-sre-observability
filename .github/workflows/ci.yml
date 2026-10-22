@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - 'hardening/**'
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -48,6 +49,9 @@ jobs:
 
       - name: Boot stack and verify failure observation and recovery
         run: ./scripts/smoke-test.sh
+
+      - name: Verify hardened runtime and receiver isolation
+        run: ./tests/smoke_hardened.sh
 
       - name: Upload alert game-day evidence
         if: always()

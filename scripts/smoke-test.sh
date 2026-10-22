@@ -13,6 +13,16 @@ for command in docker curl jq; do
   }
 done
 
+# Never inherit deployment project/port settings into a destructive fixture.
+export COMPOSE_PROJECT_NAME=homelab-sre-smoke
+export COMPOSE_FILE="$repo_root/compose.yaml"
+export COMPOSE_PROFILES=
+export SRE_IMAGE_TAG=smoke
+export SRE_API_PORT=8080 SRE_PROMETHEUS_PORT=9090 SRE_ALERTMANAGER_PORT=9093 SRE_GRAFANA_PORT=3000
+if [[ -n "$(docker ps -aq --filter label=com.docker.compose.project=homelab-sre-smoke)" ]]; then
+  echo 'Refusing to replace a pre-existing smoke-test project' >&2
+  exit 1
+fi
 export GRAFANA_ADMIN_USER=smoke-admin
 export GRAFANA_ADMIN_PASSWORD=smoke-validation-only-not-a-secret
 

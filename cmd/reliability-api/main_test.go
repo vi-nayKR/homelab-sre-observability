@@ -18,6 +18,7 @@ func executeRequest(t *testing.T, handler http.Handler, method, target, body str
 
 func TestReadinessCanFailWithoutBreakingLiveness(t *testing.T) {
 	app := newApplication(&bytes.Buffer{})
+	app.labControls = true
 	handler := app.routes()
 
 	if got := executeRequest(t, handler, http.MethodGet, "/health/ready", "").Code; got != http.StatusOK {
@@ -36,6 +37,7 @@ func TestReadinessCanFailWithoutBreakingLiveness(t *testing.T) {
 
 func TestInjectedFailureAppearsInBoundedMetrics(t *testing.T) {
 	app := newApplication(&bytes.Buffer{})
+	app.labControls = true
 	handler := app.routes()
 
 	if got := executeRequest(t, handler, http.MethodGet, "/work?fail=true", "").Code; got != http.StatusServiceUnavailable {
@@ -53,6 +55,7 @@ func TestInjectedFailureAppearsInBoundedMetrics(t *testing.T) {
 
 func TestDelayIsBounded(t *testing.T) {
 	app := newApplication(&bytes.Buffer{})
+	app.labControls = true
 	response := executeRequest(t, app.routes(), http.MethodGet, "/work?delay_ms=5001", "")
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
@@ -61,6 +64,7 @@ func TestDelayIsBounded(t *testing.T) {
 
 func TestAlertWebhookBoundsStatusLabel(t *testing.T) {
 	app := newApplication(&bytes.Buffer{})
+	app.labControls = true
 	handler := app.routes()
 	body := `{"status":"unexpected-user-value","alerts":[]}`
 	if got := executeRequest(t, handler, http.MethodPost, "/alerts", body).Code; got != http.StatusNoContent {
@@ -74,6 +78,7 @@ func TestAlertWebhookBoundsStatusLabel(t *testing.T) {
 
 func TestAlertWebhookRetainsBoundedAlertName(t *testing.T) {
 	app := newApplication(&bytes.Buffer{})
+	app.labControls = true
 	handler := app.routes()
 	body := `{"status":"resolved","alerts":[{"labels":{"alertname":"BlackboxProbeFailed"}}]}`
 	if got := executeRequest(t, handler, http.MethodPost, "/alerts", body).Code; got != http.StatusNoContent {

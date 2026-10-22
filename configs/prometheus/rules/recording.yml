@@ -3,19 +3,19 @@ groups:
     interval: 30s
     rules:
       - record: sre_demo:http_requests:rate5m
-        expr: sum(rate(sre_demo_http_requests_total[5m]))
+        expr: sum(rate(sre_demo_http_requests_total{route="/work"}[5m]))
 
       - record: sre_demo:http_errors:ratio_rate5m
         expr: |
-          sum(rate(sre_demo_http_requests_total{status_class="5xx"}[5m]))
+          (sum(rate(sre_demo_http_requests_total{route="/work",status_class="5xx"}[5m])) or vector(0))
           /
-          clamp_min(sum(rate(sre_demo_http_requests_total[5m])), 0.000000001)
+          clamp_min(sum(rate(sre_demo_http_requests_total{route="/work"}[5m])), 0.000000001)
 
       - record: sre_demo:http_request_duration_seconds:p95_rate5m
         expr: |
           histogram_quantile(
             0.95,
-            sum by (le) (rate(sre_demo_http_request_duration_seconds_bucket[5m]))
+            sum by (le) (rate(sre_demo_http_request_duration_seconds_bucket{route="/work",status_class="2xx"}[5m]))
           )
 
       - record: sre_sli:probe_success:ratio_rate5m
@@ -23,3 +23,28 @@ groups:
 
       - record: sre_sli:probe_duration_seconds:avg_rate5m
         expr: avg_over_time(probe_duration_seconds{job="blackbox-http",slo="availability"}[5m])
+
+  - name: slo-window
+    interval: 1m
+    rules:
+      # Fixed 15-second probe schedule: 28 * 24 * 60 * 4 samples.
+      # Partial observations must not masquerade as complete-window compliance.
+      - record: sre_sli:availability:coverage_ratio28d
+        expr: clamp_max(count_over_time(probe_success{job="blackbox-http",slo="availability"}[28d]) / 161280, 1)
+      - record: sre_sli:availability:observed_ratio28d
+        expr: avg_over_time(probe_success{job="blackbox-http",slo="availability"}[28d])
+      - record: sre_sli:availability:ratio28d
+        expr: |
+          clamp_max(sum_over_time(probe_success{job="blackbox-http",slo="availability"}[28d]) / 161280, 1)
+          and on (instance, service, environment, job, slo)
+          (sre_sli:availability:coverage_ratio28d >= 0.99)
+      - record: sre_sli:work:coverage_ratio28d
+        expr: clamp_max(count_over_time(up{job="demo-api"}[28d]) / 161280, 1)
+      - record: sre_sli:work_latency:observed_ratio28d
+        expr: |
+          sum(increase(sre_demo_http_request_duration_seconds_bucket{route="/work",status_class="2xx",le="0.5"}[28d]))
+          / sum(increase(sre_demo_http_request_duration_seconds_count{route="/work",status_class="2xx"}[28d]))
+      - record: sre_sli:work_latency:ratio28d
+        expr: |
+          sre_sli:work_latency:observed_ratio28d
+          and on () (min(sre_sli:work:coverage_ratio28d) >= 0.99)

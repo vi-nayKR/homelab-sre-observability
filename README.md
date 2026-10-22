@@ -9,14 +9,16 @@ A reproducible reliability lab that answers four operator questions:
 3. Does an alert describe an actionable symptom?
 4. Can another operator follow a runbook and verify recovery?
 
-This is an SRE portfolio project, not a screenshot collection. The repository contains an instrumented Go service, version-controlled Prometheus/Grafana/Alertmanager configuration, black-box probes, rule tests, failure injection, runbooks and an evidence standard.
+A single-host operations project with an explicitly disposable lab profile and a separate hardened deployment path. It includes an instrumented Go service, Prometheus/Grafana/Alertmanager, black-box probes, SLO coverage guards, authenticated receiver isolation, deployment gates and cold-backup/isolated-restore checks. It does not claim HA or achieved availability. Start with the [deployment and recovery guide](docs/OPERATIONS.md).
 
 ## What is implemented
 
 - Go 1.27 HTTP service with request count, error class, duration histogram, in-flight gauge and bounded metric labels.
 - Distinct `/health/live` and `/health/ready` behavior.
-- Safe local-only failure controls for injected 503 responses, latency and readiness failure.
-- Prometheus 3.14 with 15-day/4 GB retention ceilings.
+- Fault injection disabled by default in the binary; explicitly enabled only in the disposable lab Compose profile.
+- Prometheus 3.14 with 35-day/8 GB retention ceilings, no lifecycle mutation API, and observation-coverage guards.
+- File-backed Grafana/webhook secrets, a separately supervised authenticated receiver, bounded logs and source-commit-tagged runtime images.
+- Fail-closed single-host deployment preflight and an explicit cold-backup plus disposable-volume file-restore drill.
 - Grafana 13.2 with provisioned datasource and SRE overview dashboard.
 - Alertmanager 0.34 with grouping, inhibition and resolved notifications.
 - Blackbox exporter 0.28 for user-path availability and latency.
@@ -52,7 +54,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for signal flow and trust bound
 
 The stack supports ARM64 and AMD64 images. The optional `linux-host` profile is Linux-only.
 
-## Quick start
+## Disposable lab quick start
 
 ```bash
 make bootstrap
@@ -93,7 +95,7 @@ curl -i http://127.0.0.1:8080/health/live
 make restore-readiness
 ```
 
-The controls are intentionally unauthenticated because the service binds only to loopback in this lab. They are not a production pattern.
+The lab explicitly enables unauthenticated game-day controls and binds published ports to loopback. The binary defaults to controls disabled, and the hardened overlay forces them off. Do not deploy the lab profile as a hardened service; use [OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Adding homelab targets
 
@@ -125,8 +127,9 @@ The script checks:
 - every YAML file and dashboard JSON;
 - the full Prometheus configuration;
 - Prometheus alert/recording rule tests;
-- Alertmanager configuration;
-- Compose resolution and the demo container build when Docker is available.
+- lab and hardened Alertmanager/Compose configuration, including rejection of insecure deployment models;
+- source-build and compiler-free, revision-labeled runtime images when Docker is available;
+- the hardened CI fixture: protected controls, authenticated Watchdog delivery, receiver survival across API restart, SLO warm-up, and cold-backup/isolated file-restore verification.
 - clean-stack startup, service readiness, metric scraping, injected readiness failure, black-box observation and recovery in CI.
 - a real two-minute `BlackboxProbeFailed` hold, Prometheus firing state, Alertmanager routing, firing/resolved webhook delivery, and retained API evidence in CI.
 
@@ -163,9 +166,9 @@ Do not describe the following as complete until artifacts exist under `evidence/
 
 - This is a single monitoring stack with no Prometheus/Alertmanager redundancy.
 - A laptop that sleeps cannot measure its own absence.
-- The default webhook receiver runs in the demo service, so a complete demo outage also breaks that receiver; Alertmanager still retains the alert in its UI. A real page receiver must be out of failure domain.
+- The lab receiver shares the demo service. The hardened receiver is a separate authenticated container, but still shares the host; independent paging and missing-heartbeat detection remain required for host-loss coverage.
 - Local black-box probes do not prove the view from another region or ISP.
-- Fifteen-day retention is shorter than the 28-day SLO window; long-window proof needs longer retention or remote storage.
+- Configured 35-day retention is not proof of 28 days of data: the size cap can evict earlier. Coverage is displayed, warm-up is suppressed, and missing expected probes consume the conservative availability budget.
 - No actual availability, MTTR or performance improvement is claimed yet.
 
 See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and [docs/SECURITY.md](docs/SECURITY.md).

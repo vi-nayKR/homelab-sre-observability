@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+.private
+.state
+.deploy
+tools
+evidence/runtime
+**/__pycache__
