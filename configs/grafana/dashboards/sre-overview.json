@@ -587,13 +587,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ALERTS{alertstate=\"firing\"}",
+          "expr": "ALERTS{alertstate=\"firing\",severity!=\"none\"}",
           "legendFormat": "{{alertname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Firing alerts",
+      "title": "Actionable firing alerts (excludes heartbeat)",
       "type": "stat"
     },
     {
